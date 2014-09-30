@@ -426,4 +426,66 @@ Shell.prototype.mkdirp = function(path, callback) {
   _mkdirp(path, callback);
 };
 
+/**
+ * Check the size of all files in current directory, and any subdirectories.
+ * Print out the total to standard I/O.
+ * No valid options available yet.
+ */
+Shell.prototype.du = function(dir, options, callback) {
+  var shell = this;
+  var fs = shell.fs;
+  var results = {};
+  results.entry = [];
+  results.number = [];
+  results.total = 0;
+
+  if(typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  options = options || {};
+  callback = callback || function(){};
+
+  if(!dir) {
+    callback(new Errors.EINVAL('Missing dir argument'));
+    return;
+  }
+
+  var tempSize = 1000; //Size of data block. Can be changed with modifications to the code below.
+
+  function addResultsEntry(entryPath, size1){
+	results.total += size1;
+	results.entry.push(entryPath);
+	results.number.push(size1);
+  }
+
+  function tally(path, callback){
+	  var total = 0;
+	  shell.ls(path, function(err, list){
+	    if(err) throw err;
+		if(list.length == 0){
+		  callback(total);
+		  return;
+		}
+	    for(var i = 0; i < list.length; i++){
+		  if(list[i].type != 'DIRECTORY'){
+		    var size = list[i].size;
+			if(size >= tempSize - 1 + tempSize / 2){
+		      size = size/tempSize;
+		      total += (size - floor(size) > 0.5) ? ceil(size) : floor(size);
+	        }else{
+	          total += 1;
+	        }
+		  }else{
+			//total += tally(list[i].path, callback);
+			tally(list[i].path, callback);
+		  }
+	    }
+		callback(total);
+		return;
+	  });
+  }
+  tally(dir, callback);
+};
+
 module.exports = Shell;
